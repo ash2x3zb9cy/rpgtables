@@ -1,6 +1,9 @@
 # rpgtables
 Django app to create and use rollable tables for eg. RPGs.
 
+## Example table
+![Demo image](http://i.imgur.com/DmChDmA.png)
+
 ## USAGE
 
 First time setup:
