@@ -1,0 +1,147 @@
+<script src="http://code.jquery.com/jquery-3.2.1.min.js"></script>
+<h1>{{object.name}}</h1><a href="{% url 'table_update' object.id %}">rename</a>
+<div class="table-outer">
+	<ul class="table-ul">
+	</ul>
+	<button class="add-field">+</button>
+	<button class="save">Save</button>
+	<br>
+	<input type="number" placeholder="modifier (eg +1)" class="mod">
+	<button class="roll">Roll!</button>
+	<br>
+	<table class="result">
+		<tr><th>Raw roll</th><th>Modified roll</th><th>Result</th></tr>
+	</table>
+</div>
+
+<a href="{% url 'table_index' %}">Back</a>
+
+{% csrf_token %}
+<script type="text/javascript">
+var csrftoken = $("[name=csrfmiddlewaretoken]").val();
+</script>
+
+<script>
+	// Inclusive!
+	function randint(min, max) {
+		return Math.floor(Math.random() * (max - min + 1)) + min;
+	}
+
+	/*function clamp(number, low, high) {
+		return Math.min(Math.max(number, low), high)
+	}*/
+
+	$(function(){
+
+		{% if object %}
+			console.log('Found DB object')
+			let fields = {% autoescape off %}{{object.fields}}{% endautoescape %};
+			let tableUL = $('.table-ul');
+			for (var i = 0; i < fields.length; i++) {
+				let item = $addField(tableUL)
+				item.find('.from').val(fields[i].from)
+				item.find('.to').val(fields[i].to)
+				item.find('.name').val(fields[i].name)
+			}
+		{% endif %}
+
+		function save($ul) {
+			table = []
+			$ul.children().each(function(i, v) {
+				let $v = $(v)
+				table.push({
+					from: $v.children('.from').val(),
+					to: $v.children('.to').val(),
+					name: $v.children('.name').val(),
+				})
+			})
+
+			/*let tableid = window.location.pathname.split('/')
+			// -2 because url has trailing slash too
+			tableid = tableid[tableid.length-2]
+
+			let url = '{% url 'table_save' 0 %}'
+			console.log(url)*/
+			let data = {
+				'fields': JSON.stringify(table),
+				'csrfmiddlewaretoken': csrftoken
+			}
+			$.post('save/', data, function(data, status, xhr){
+				console.log(status)
+				console.log(data)
+			})
+
+		}
+
+		$('.save').click(function(e) {
+			save($(e.currentTarget).siblings('.table-ul'))
+		})
+
+		function $addField(e) {
+			let $table;
+			if (e.currentTarget) {
+				$table = $(e.currentTarget).siblings('.table-ul')
+			} else {
+				$table = e
+			}
+			let obj = $('<li><input type="number" class="from"> - <input type="number" class="to">: <input type="text" class="name"></li>')
+			$table.append(obj)
+			return obj
+		}
+
+		function $roll(e) {
+			let $fields = $(e.currentTarget).siblings('.table-ul').children()
+			let mod = parseInt($(e.currentTarget).siblings('.mod').val()) || 0
+			let max = -Infinity
+			let min = Infinity
+			// First pass to determine what die to roll
+			for (let i = 0; i < $fields.length; i++) {
+				let $f = $($fields[i]);
+
+				let lb = parseInt($f.children('.from').val()) || 0
+				let ub = parseInt($f.children('.to').val()) || 0
+
+				if(lb<min) min=lb;
+				if(ub>max) max=ub;
+			}
+
+			let rawRoll = randint(min, max)
+			// apply modifier.
+			//number = number + mod
+			let modifiedRoll = rawRoll + mod
+			let overload = NaN
+			let result=NaN
+			if(modifiedRoll > max) {
+				overload = modifiedRoll - max
+				result = max
+			} else if (modifiedRoll < min) {
+				overload = modifiedRoll - min
+				result = min
+			} else { result = modifiedRoll }
+
+			//console.log("rolling " + min + "-" + max + ": " + result)
+			// second pass to find a suitable result
+			// this could be avoided if we worked out some cool lookup method for ranges
+			for (let i = 0; i < $fields.length; i++) {
+				let $f = $($fields[i]);
+				let lb = parseInt($f.children('.from').val()) || 0
+				let ub = parseInt($f.children('.to').val()) || 0
+				let name = $f.children('.name').val()// || 'untitled'
+				if(result <= ub && result >= lb) {
+					// Raw roll / modified roll / result
+					let tr = '<tr>'
+						+'<td>'+rawRoll+'</td>'
+						+'<td>'+modifiedRoll+'</td>'
+						+'<td>'+name+'</td>'
+						+'</tr>';
+					$(e.currentTarget).siblings('.result').append(tr);
+				}
+			}
+
+		}
+
+		$('.add-field').click($addField)
+		$('.roll').click($roll)
+
+	})
+</script>
